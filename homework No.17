@@ -1,0 +1,178 @@
+import pandas as pd
+import numpy as np
+
+import seaborn as sns
+
+import matplotlib.pyplot as plt
+
+
+import sklearn
+
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import scale
+
+import statsmodels
+
+data = pd.read_csv('C:/Users/maryn/Downloads/my_phone.csv')
+data.head()
+
+data.shape
+
+
+data.describe()
+
+data.isna().any()
+
+duplicates = data[data.duplicated()]
+
+duplicates
+
+data = data[['battery_power', 'weight', 'memory', 'n_cores', 'ram', 'pixel_height', 'pixel_width', 'price_range']]
+
+#column UNNAMED is useless. 
+
+data.describe()
+
+data[data['pixel_height'] <100]
+
+np.where(data["pixel_height"] <=0)
+
+#replace pixel_height <135 (weird variables in min)
+
+data.loc[data['pixel_height']<=0]
+
+for column in data.columns:
+    median = data.loc[data[column]>0, column].median()
+    data[column] = np.where(data[column] <=0, median, data[column])
+data.describe()
+
+data.loc[data['pixel_height']<=0]
+
+data[data['pixel_width'] <240]
+
+#respective pixel_height to minimal pixel_width is 135 (serched in Google)
+
+data.loc[data['pixel_height']<=135]
+
+np.where(data["pixel_height"] <=135)
+
+for column ["pixel_height"] in data.columns:
+    median = data.loc[data[column["pixel_height"]]>0, column].median()
+    data[column] = np.where(data[column["pixel_height"]] <=135, median, data[column])
+data.describe()
+
+#не знайшла, як замінити вибіркові дані (менше 135) виключно в одній колонці (pixel_height) медіаною. 
+
+fig, axs = plt.subplots(1, 7, sharey = True)
+data.plot(kind='scatter', x = 'battery_power', y = 'price_range', ax = axs[0], figsize = (10,8))
+data.plot(kind='scatter', x = 'weight', y = 'price_range', ax = axs[1])
+data.plot(kind='scatter', x = 'memory', y = 'price_range', ax = axs[2])
+data.plot(kind='scatter', x = 'n_cores', y = 'price_range', ax = axs[3])
+data.plot(kind='scatter', x = 'ram', y = 'price_range', ax = axs[4])
+data.plot(kind='scatter', x = 'pixel_height', y = 'price_range', ax = axs[5])
+data.plot(kind='scatter', x = 'pixel_width', y = 'price_range', ax = axs[6])
+plt.show()
+
+#мабуть, треба було замінити price_range зі значень 1-2-3 на діапазон відсотків. 
+
+import statsmodels.formula.api as sts
+
+lin = sts.ols(formula = 'price_range ~ battery_power + weight + memory + n_cores + ram + pixel_height + pixel_width', data=data).fit()
+
+lin.params
+
+#price_range = 0.410 - 0.000221 * battery_power - (-0.000804) * weight  - (-0.00246) * memory - (-0.014671) * n_cores  -     0.000569 * ram - 0.000256 * pixel_height   -   0.000003 * pixel_width  
+# найбільша залежність - негативна від n_cores (-0,015). 
+
+data = data.dropna()
+
+X = data.drop(columns=['price_range'])
+Y = data['price_range']
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=20)
+
+from sklearn import neighbors
+KNN_model = neighbors.KNeighborsClassifier(n_neighbors=30)
+KNN_model.fit(X_train,Y_train)
+
+pred = KNN_model.predict(X_test)
+acc = sum(Y_test==pred)/len(Y_test)*100
+print('Accuracy =', acc)
+
+#accuracy = 96 %
+
+from sklearn.linear_model import LogisticRegression
+classifier = LogisticRegression(random_state = 20, solver='lbfgs', multi_class='auto')
+classifier.fit(X_train, Y_train)
+
+pred = classifier.predict(X_test)
+
+probs_y = classifier.predict_proba(X_test)
+
+probs_y = np.round(probs_y, 2)
+
+from sklearn.metrics import accuracy_score 
+print ("Accuracy : ", accuracy_score(Y_test, pred))
+
+#log reg - не доробила
+
+X = data.iloc[:, [0,1,2,3]].values
+Y = data.iloc[:, 7].values
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 20)
+
+
+Y_train
+
+from sklearn.linear_model import LogisticRegression
+classifier = LogisticRegression(random_state = 30, solver='lbfgs', multi_class='auto')
+classifier.fit(X_train, Y_train)
+
+res = "{:<10} | {:<10} | {:<10} | {:<13} | {:<5}".format("Y_test", "Y_pred", "0(%)", "1(%)", "2(%)\n")
+res += "-"*65+"\n"
+res += "\n".join("{:<10} | {:<10} | {:<10} | {:<13} | {:<10}".format(x, y, a, b, c) for x, y, a, b, c in zip(Y_test, pred, probs_y[:,0], probs_y[:,1], probs_y[:,2]))
+res += "\n"+"-"*65+"\n"
+print(res)
+
+pred = classifier.predict(X_test)
+
+probs_y = classifier.predict_proba(X_test)
+
+probs_y = np.round(probs_y, 2)
+
+from sklearn.metrics import accuracy_score 
+print ("Accuracy : ", accuracy_score(Y_test, pred))
+
+from sklearn.preprocessing import LabelEncoder 
+
+encoder = LabelEncoder()
+data['price_range'] = encoder.fit_transform(data['price_range'])
+data
+
+data.price_range.value_counts()
+
+X = data.iloc[:, :7].values
+Y = data['price_range'].values
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 20)
+
+from sklearn.cluster import KMeans
+
+kmeans = KMeans(n_clusters = 4)
+kmeans.fit(X_train)
+
+from sklearn.metrics import accuracy_score 
+
+pred = kmeans.predict(X_test)
+print ("Accuracy : ", accuracy_score(Y_test, pred))
+
+sse = [] # sum of squared errors
+for k in range(1,25):
+    kmeans = KMeans(n_clusters = k)
+    kmeans.fit(X_train)
+    sse.append(kmeans.inertia_)
+
+df_cluster = pd.DataFrame({'Cluster': range(1,25), 'SSE': sse})
